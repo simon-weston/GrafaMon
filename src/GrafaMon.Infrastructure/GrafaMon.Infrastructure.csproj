@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GrafaMon.Application\GrafaMon.Application.csproj" />
+    <ProjectReference Include="..\GrafaMon.Domain\GrafaMon.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

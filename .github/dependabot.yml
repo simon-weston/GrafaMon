@@ -1,0 +1,98 @@
+# Dependabot configuration for GrafaMon
+# Keeps NuGet packages and GitHub Actions up to date.
+# PRs are opened against 'develop' (feature branch workflow) and then
+# merged into main via the normal release process.
+#
+# Strategy: minor and patch updates only (no major bumps that could
+# break the application). Major-version groups are watched but labelled
+# separately so they can be reviewed manually.
+
+version: 2
+
+updates:
+
+  # ── NuGet (C# projects) ──────────────────────────────────────────────────
+  - package-ecosystem: "nuget"
+    directory: "/src"           # solution root – Dependabot walks all .csproj files
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "06:00"
+      timezone: "Europe/London"
+    target-branch: "main"
+    open-pull-requests-limit: 10
+
+    labels:
+      - "dependencies"
+      - "nuget"
+
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+    groups:
+      microsoft-extensions-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "Microsoft.Extensions.*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      serilog-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "Serilog*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      nunit-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "NUnit*"
+          - "coverlet.*"
+          - "Microsoft.NET.Test.Sdk"
+        update-types:
+          - "minor"
+          - "patch"
+
+      system-packages-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "System.*"
+        update-types:
+          - "minor"
+          - "patch"
+
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # ── GitHub Actions ────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "06:00"
+      timezone: "Europe/London"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

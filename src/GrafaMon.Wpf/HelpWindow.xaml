@@ -1,0 +1,21 @@
+<Window x:Class="GrafaMon.Wpf.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GrafaMon Help"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#1E1E1E">
+    <Border Padding="16" Background="#1E1E1E">
+        <StackPanel>
+            <TextBlock Text="GrafaMon (Graf-a-Mon)" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+            <TextBlock Text="Grafana Alert Monitoring Desktop Notifier" Foreground="#CCCCCC" Margin="0,0,0,12"/>
+            <TextBlock Name="TxtVersion" Foreground="#CCCCCC" Margin="0,0,0,12"/>
+            <TextBlock Text="Author: Simon Weston" Foreground="White" Margin="0,0,0,6"/>
+            <TextBlock Text="License: GPLv3" Foreground="White" Margin="0,0,0,6"/>
+            <TextBlock Text="https://github.com/simon-weston/GrafaMon" Foreground="#4DA3FF" Margin="0,0,0,16"/>
+            <Button Content="Close" Width="80" HorizontalAlignment="Right" Click="OnCloseClick"/>
+        </StackPanel>
+    </Border>
+</Window>

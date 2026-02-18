@@ -1,0 +1,12 @@
+﻿{
+    "GrafanaAlertInstance": {
+        "GrafanaBaseUrl": "https://YOUR-GRAFANA-INSTANCE.grafana.net",
+        "ApiKey": "YOUR-API-KEY-HERE",
+        "PollingIntervalSeconds": 20,
+        "ActiveAlertsPath": "/api/alertmanager/grafana/api/v2/alerts?active=true&silenced=false&inhibited=false",
+        "GrafanaOrgId": "1",
+        "MaxAlertDetailRows": 25,
+        "EnableSoundNotifications": true,
+        "SoundFilePath": null
+    }
+}

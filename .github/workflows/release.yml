@@ -1,0 +1,229 @@
+﻿name: Build and Release MSI
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  
+    inputs:
+      create_release:
+        description: 'Create a release (true/false)'
+        required: false
+        default: 'false'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+permissions:
+  contents: write
+  checks: write          # allows creating check runs
+  pull-requests: write   # allows commenting on PRs
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for commit count
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Get version from Git
+      id: version
+      shell: pwsh
+      run: |
+        $commitCount = (git rev-list --count HEAD)
+        $year = (Get-Date).Year % 100
+        $dayOfYear = (Get-Date).DayOfYear
+        $version = "$year.$dayOfYear.$commitCount"
+        $commitSha = (git rev-parse --short HEAD)
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "COMMIT_SHA=$commitSha" >> $env:GITHUB_OUTPUT
+    
+    - name: Restore dependencies
+      run: dotnet restore src/GrafaMon.Wpf/GrafaMon.Wpf.csproj
+    
+    - name: Build application
+      run: |
+        dotnet publish src/GrafaMon.Wpf/GrafaMon.Wpf.csproj `
+          -c Release `
+          -r win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:BuildVersion=${{ steps.version.outputs.VERSION }} `
+          -o artifacts/publish
+    
+    - name: Run tests
+      run: dotnet test --configuration Release --verbosity normal --logger "trx"
+      working-directory: ./src
+    
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action/windows@v2
+      if: always()
+      with:
+        files: |
+          src/**/*.trx
+        check_name: "Test Results"
+        comment_mode: off  # Optional: disable PR comments if you don't want them
+        fail_on: "test failures"
+
+    - name: Install WiX Toolset
+      run: dotnet tool install --global wix 
+    
+    - name: Build MSI installer
+      shell: pwsh
+      run: |
+        dotnet build src/GrafaMon.Installer/GrafaMon.Installer.wixproj `
+          -c Release `
+          -p:Version=${{ steps.version.outputs.VERSION }} `
+          -p:WixBindPaths="PublishDir=$PWD/artifacts/publish;SolutionDir=$PWD/src" `
+          -o artifacts
+    
+    - name: Rename MSI with version
+      shell: pwsh
+      run: |
+        $msiFile = Get-ChildItem -Path artifacts -Filter "*.msi" | Select-Object -First 1
+        if (-not $msiFile) {
+           Write-Error "No MSI file found in artifacts directory!"
+           exit 1
+        }
+        $newName = "GrafaMon-v${{ steps.version.outputs.VERSION }}-${{ steps.version.outputs.COMMIT_SHA }}.msi"
+        Rename-Item -Path $msiFile.FullName -NewName $newName
+        echo "MSI_FILENAME=$newName" >> $env:GITHUB_ENV
+        echo "Renamed MSI to: $newName"
+    
+    - name: Generate Checksums
+      run: |
+        Get-ChildItem -Path "artifacts" -Filter "*.msi" | ForEach-Object {
+          $hash = Get-FileHash $_.FullName -Algorithm SHA256
+          "$($hash.Hash)  $($_.Name)" | Out-File -Append "artifacts\checksums.txt"
+        }
+      shell: pwsh
+          
+    - name: Upload checksums artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GrafaMon-Checksums
+        path: artifacts/checksums.txt
+        retention-days: 90
+
+    - name: Upload MSI artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GrafaMon-MSI
+        path: artifacts/*.msi
+        retention-days: 90
+    
+    - name: Comment PR with Build Results
+      if: github.event_name == 'pull_request' && success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+      
+          // Read checksum file
+          let checksums = '';
+          try {
+            checksums = fs.readFileSync('artifacts/checksums.txt', 'utf8');
+          } catch (err) {
+            checksums = 'Checksums not available';
+          }
+          const comment = `## ✅ Build Succeeded!
+      
+          **Build Details:**
+          - **Version**: \`${{ steps.version.outputs.VERSION }}\`
+          - **Commit**: \`${{ steps.version.outputs.COMMIT_SHA }}\`
+          - **MSI File**: \`${{ env.MSI_FILENAME }}\`
+      
+          **Checksums (SHA256):**
+          \`\`\`
+          ${checksums}
+          \`\`\`
+      
+          **Download Artifacts:**
+          - [MSI Installer](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          `;    
+          
+          github.rest.issues.createComment({
+          issue_number: context.issue.number,
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          body: '✅ Build succeeded!\n\n**Version**: ${{ steps.version.outputs.VERSION }}\n**Commit**: ${{ steps.version.outputs.COMMIT_SHA }}'
+          })
+
+    - name: Create Release (main branch only)
+      if: >
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: GrafaMon v${{ steps.version.outputs.VERSION }}
+        body: |
+          ## GrafaMon v${{ steps.version.outputs.VERSION }}
+          
+          GrafaMon (Graf-a-Mon) - Grafana Alert Monitoring Desktop Notifier
+          
+          ### 📦 Installation
+          
+          **Requirements:**
+          - Windows 10 version 1809 (build 17763) or later
+          - .NET 8.0 Runtime (Desktop) - [Download here](https://dotnet.microsoft.com/download/dotnet/8.0/runtime)
+          
+          **Install:**
+          1. Download `GrafaMon-v${{ steps.version.outputs.VERSION }}-${{ steps.version.outputs.COMMIT_SHA }}.msi`
+          2. Double-click to install (requires administrator privileges)
+          3. Follow the installation wizard
+          4. Launch GrafaMon from Start Menu or Desktop shortcut
+          
+          **Silent Install:**
+          ```
+          msiexec /i GrafaMon-v${{ steps.version.outputs.VERSION }}-${{ steps.version.outputs.COMMIT_SHA }}.msi /quiet
+          ```
+          
+          **Custom Install Directory:**
+          ```
+          msiexec /i GrafaMon-v${{ steps.version.outputs.VERSION }}-${{ steps.version.outputs.COMMIT_SHA }}.msi INSTALLDIR="C:\CustomPath\GrafaMon"
+          ```
+          
+          ### 📝 What's Included
+          
+          - GrafaMon Desktop Application
+          - Documentation (README, CONFIGURATION, LICENSE)
+          - Start Menu shortcut
+          - Desktop shortcut (optional during install)
+          - Auto-start on Windows login (optional during install)
+          
+          ### 🔗 Links
+          
+          - [Documentation](https://github.com/simon-weston/GrafaMon/blob/main/README.md)
+          - [Configuration Guide](https://github.com/simon-weston/GrafaMon/blob/main/CONFIGURATION.md)
+          - [Report Issues](https://github.com/simon-weston/GrafaMon/issues)
+          
+          **Commit:** ${{ steps.version.outputs.COMMIT_SHA }}
+        files: |
+          artifacts/*.msi
+          artifacts/checksums.txt
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Job Summary
+      if: success()
+      shell: pwsh
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ steps.version.outputs.COMMIT_SHA }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **MSI File**: ${{ env.MSI_FILENAME }}" >> $GITHUB_STEP_SUMMARY

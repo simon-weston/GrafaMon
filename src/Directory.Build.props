@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <!-- Centralized version management -->
+    <!-- BuildVersion is passed from build scripts in MSI-compliant format: YY.DDD.NN -->
+    <!-- YY = Last 2 digits of year (0-99) -->
+    <!-- DDD = Day of year (1-366) -->
+    <!-- NN = Git commit count -->
+    <BuildVersion Condition="'$(BuildVersion)' == ''">1.0.0</BuildVersion>
+    
+    <!-- Apply BuildVersion to all version properties -->
+    <!-- MSI-compliant format ensures compatibility with Windows Installer (Major<256, Minor<256, Build<65536) -->
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
+    <ProductVersion>$(BuildVersion)</ProductVersion>
+    <InformationalVersion>$(BuildVersion)</InformationalVersion>
+  </PropertyGroup>
+</Project>

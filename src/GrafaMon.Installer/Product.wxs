@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  
+  <Package Name="GrafaMon" 
+           Language="1033" 
+           Version="!(bind.FileVersion.GrafaMon.Wpf.exe)"
+           Manufacturer="Simon Weston" 
+           UpgradeCode="A9F8E7D6-5C4B-3A2F-1E0D-9C8B7A6F5E4D"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes">
+    
+    <SummaryInformation Description="Grafana Alert Monitoring Desktop Notifier"
+                        Comments="GrafaMon - Real-time Grafana alert notifications on your desktop"
+                        Manufacturer="Simon Weston" />
+
+    <!-- Upgrade detection - Schedule removal of old products before installing new ones -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." 
+                  AllowSameVersionUpgrades="no"
+                  Schedule="afterInstallInitialize" />
+    
+    <!-- Media Definition -->
+    <MediaTemplate EmbedCab="yes" />
+    
+    <!-- Application Icon -->
+    <Icon Id="AppIcon" SourceFile="..\GrafaMon.Wpf\Assets\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    
+    <!-- Add/Remove Programs Properties -->
+    <Property Id="ARPHELPLINK" Value="https://github.com/simon-weston/GrafaMon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/simon-weston/GrafaMon" />
+    <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
+    <Property Id="ARPNOMODIFY" Value="yes" Secure="yes" />
+       
+    <!-- Installation Options -->
+    <Property Id="DESKTOPSHORTCUT" Value="1" />
+    
+    <!-- Launch Conditions -->
+    <!-- Windows 8.1 = VersionNT 603, Windows 10 1809 = 10.0.17763 -->
+    <Launch Condition="Installed OR (VersionNT >= 603)" 
+            Message="This application requires Windows 8.1 or later. For full functionality, Windows 10 version 1809 (build 17763) or later is recommended." />
+    
+    <!-- Detect if application is running -->
+    <util:CloseApplication Id="CloseGrafaMon" 
+                          Target="GrafaMon.Wpf.exe" 
+                          CloseMessage="yes"
+                          Description="GrafaMon is currently running. Please save any settings and click OK to close it automatically, or click Cancel to close it manually."
+                          RebootPrompt="no"
+                          TerminateProcess="0"
+                          Timeout="30" />
+
+    <!-- Directory Structure -->
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="GrafaMon" />
+    </StandardDirectory>
+    
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="GrafaMon"/>
+    </StandardDirectory>
+    
+    <StandardDirectory Id="DesktopFolder" />
+    
+    <!-- Components -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Main Executable -->
+      <Component Id="MainExecutable" Guid="B8E7F6D5-4C3A-2F1E-0D9C-8B7A6F5E4D3C">
+        <File Id="GrafaMon.Wpf.exe" 
+              Source="..\..\artifacts\publish\GrafaMon.Wpf.exe"
+              KeyPath="yes" />
+        
+        <!-- Registry for install path (HKLM for perMachine) -->
+        <RegistryKey Root="HKLM" Key="Software\GrafaMon">
+          <RegistryValue Type="string" Name="InstallPath" Value="[INSTALLFOLDER]" KeyPath="no" />
+          <RegistryValue Type="string" Name="Version" Value="[ProductVersion]" KeyPath="no" />
+        </RegistryKey>
+      </Component>
+      
+      <!-- Documentation Files -->
+      <Component Id="Documentation" Guid="C9F8E7D6-5D4C-3B2A-1F0E-9D8C7B6A5F4E">
+        <File Id="README.md" Source="..\..\README.md" KeyPath="yes" />
+        <File Id="LICENSE" Source="..\..\LICENSE" />
+        <File Id="CONFIGURATION.md" Source="..\docs\CONFIGURATION.md" />
+      </Component>
+      
+    </ComponentGroup>
+    
+    <!-- Start Menu Shortcut Component (Always installed) -->
+    <Component Id="ApplicationShortcut" 
+               Directory="ApplicationProgramsFolder"
+               Guid="DAF9E8D7-6E5D-4C3B-2A1F-0E9D8C7B6A5F">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="GrafaMon"
+                Description="Grafana Alert Monitoring Desktop Notifier"
+                Target="[INSTALLFOLDER]GrafaMon.Wpf.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RemoveFolder Id="CleanUpShortCut" On="uninstall" />
+      <!-- Use HKCU for per-user shortcut component KeyPath (required for perMachine with user profile shortcuts) -->
+      <RegistryValue Root="HKCU" 
+                     Key="Software\GrafaMon\Components" 
+                     Name="StartMenuShortcut" 
+                     Type="integer" 
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+    
+    <!-- Desktop Shortcut Component (Optional) -->
+    <Component Id="DesktopShortcut" 
+               Directory="DesktopFolder"
+               Guid="EBF0E9D8-7F6E-5D4C-3B2A-1F0E9D8C7B6A"
+               Condition="DESKTOPSHORTCUT = 1">
+      <Shortcut Id="ApplicationDesktopShortcut"
+                Name="GrafaMon"
+                Description="Grafana Alert Monitoring Desktop Notifier"
+                Target="[INSTALLFOLDER]GrafaMon.Wpf.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RemoveFolder Id="CleanUpDesktopShortcut" On="uninstall" />
+      <!-- Use HKCU for per-user shortcut component KeyPath (required for perMachine with user profile shortcuts) -->
+      <RegistryValue Root="HKCU" 
+                     Key="Software\GrafaMon\Components" 
+                     Name="DesktopShortcut" 
+                     Type="integer" 
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+    
+    <!-- Feature Definition -->
+    <Feature Id="ProductFeature" 
+             Title="GrafaMon" 
+             Level="1"
+             Description="The complete GrafaMon application"
+             ConfigurableDirectory="INSTALLFOLDER"
+             AllowAdvertise="no"
+             Display="expand">
+      
+      <!-- Core application files (always installed) -->
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      
+      <!-- Optional desktop shortcut -->
+      <Feature Id="DesktopShortcutFeature"
+               Title="Desktop Shortcut"
+               Description="Create a shortcut on the desktop"
+               Level="1"
+               AllowAdvertise="no">
+        <ComponentRef Id="DesktopShortcut" />
+      </Feature>
+    </Feature>
+    
+  </Package>
+</Wix>
