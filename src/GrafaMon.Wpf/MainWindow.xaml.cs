@@ -1,20 +1,16 @@
 ﻿// Copyright(C) 2026 Simon Weston
 // Licensed under the GNU General Public License v3.0
 // SPDX-License-Identifier: GPL-3.0-only
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using GrafaMon.Application;
+using GrafaMon.Domain;
+using Serilog;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Threading;
-using System.Windows.Forms;
 using System.Windows.Media;
-using GrafaMon.Application;
-using GrafaMon.Domain;
-using Serilog;
+using System.Windows.Threading;
 
 namespace GrafaMon.Wpf
 {
@@ -32,6 +28,7 @@ namespace GrafaMon.Wpf
 
         private DispatcherTimer? _hideTimer;
         private DispatcherTimer? _topmostTimer;
+        private DispatcherTimer? _mouseHoverTimer;
         private bool _detailsAlignRight;
         private bool _alignmentLocked;
         private double? _summaryScreenX;
@@ -82,23 +79,15 @@ namespace GrafaMon.Wpf
                 });
             };
 
-            // Setup mouse interaction for summary border
-            if (RootBorder != null)
+            _mouseHoverTimer = new DispatcherTimer
             {
-                RootBorder.MouseEnter += (_, _) =>
-                {
-                    if (_vm.HasAlerts)
-                    {
-                        _hideTimer?.Stop();
-                        ShowDetails();
-                    }
-                };
+                Interval = TimeSpan.FromMilliseconds(500)
+            };
 
-                RootBorder.MouseLeave += (_, _) =>
-                {
-                    StartHideTimer();
-                };
-            }
+            // Setup mouse interaction for summary border
+            _mouseHoverTimer.Tick += MouseHoverTime_Click;
+            RootBorder.MouseEnter += RootBorder_MouseEnter;
+            RootBorder.MouseLeave += RootBorder_MouseLeave;
 
             // Setup mouse interaction for details panel
             if (DetailsPanel != null)
@@ -235,10 +224,38 @@ namespace GrafaMon.Wpf
             _hideTimer?.Stop();
             _hideTimer = null;
 
-            _topmostTimer?.Stop(); 
+            _topmostTimer?.Stop();
 
             _cts.Cancel();
             _cts.Dispose();
+        }
+
+        private void RootBorder_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (_vm.HasAlerts)
+            {
+                // Stop the hide timer if it's currently running
+                _hideTimer?.Stop();
+
+                // Restart the hover timer to begin the 1.5-second countdown
+                _mouseHoverTimer.Stop();
+                _mouseHoverTimer.Start();
+            }
+        }
+
+        private void RootBorder_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            // Crucial: If they leave before the timer ticks, cancel it!
+            _mouseHoverTimer.Stop();
+
+            // (Optional) You might also want to start your _hideTimer here
+            _hideTimer?.Start();
+        }
+
+        private void MouseHoverTime_Click(object? sender, EventArgs e)
+        {
+            _mouseHoverTimer?.Stop();
+            ShowDetails();
         }
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -488,7 +505,7 @@ namespace GrafaMon.Wpf
         private Rect GetWorkAreaInDip()
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            var screen = Screen.FromHandle(hwnd); 
+            var screen = Screen.FromHandle(hwnd);
             var work = screen.WorkingArea; // pixels
 
             var source = PresentationSource.FromVisual(this);
